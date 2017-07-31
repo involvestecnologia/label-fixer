@@ -1,0 +1,19 @@
+{
+  "name": "label-fixer",
+  "version": "0.0.0",
+  "private": true,
+  "main": "app.js",
+  "scripts": {},
+  "dependencies": {
+    "async": "^2.5.0",
+    "bluebird": "^3.5.0",
+    "debug": "^2.6.8",
+    "github": "^9.2.0",
+    "lodash": "^4.17.4"
+  },
+  "devDependencies": {
+    "eslint": "^4.3.0",
+    "eslint-config-airbnb-base": "^11.3.1",
+    "eslint-plugin-import": "^2.7.0"
+  }
+}
