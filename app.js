@@ -37,7 +37,7 @@ const LABELS = [
 ];
 
 const github = new GitHubApi({
-  debug: true,
+  debug: false,
   Promise,
 });
 
@@ -163,61 +163,27 @@ async function buildIssuesList(issues) {
   return modifyable;
 }
 
-function addIssueLabels(issue) {
-  const http = require('https');
-
-  const options = {
-    method: 'POST',
-    hostname: 'api.github.com',
-    port: null,
-    path: `/repos/involvestecnologia/agilepromoterissues/issues/${issue.number}/labels`,
-    headers: {
-      host: 'api.github.com',
-      'content-length': '46',
-      'content-type': 'application/json; charset=utf-8',
-      authorization: 'token 7ebd2974c9b02111853b6ed1943e94e950099f25',
-      'user-agent': 'NodeJS HTTP Client',
-      accept: 'application/vnd.github.v3+json',
-      ca: 'undefined',
-      'cache-control': 'no-cache',
-    },
-  };
-
-  return new Promise((resolve, reject) => {
-    const labels = _.map(issue.labels, 'NEW');
-    const req = http.request(options, (res) => {
-      const hasError = res.statusCode !== 200;
-
-      const chunks = [];
-
-      res.on('data', (chunk) => {
-        chunks.push(chunk);
-      });
-
-      res.on('end', () => {
-        (hasError ? reject : resolve)(Buffer.concat(chunks));
-      });
-    });
-
-    req.on('error', reject);
-
-    req.write(JSON.stringify(labels));
-    req.end();
-  });
-}
-
-function addlabel(issue) {
+async function addlabel(issue) {
   const labels = _.map(issue.labels, 'NEW');
   debug('updating issue: ', issue.number, ' with labels: ', labels);
   if (process.env.NODE_ENV === 'production') {
-    return addIssueLabels(issue);
+    return github.issues.addLabels({
+      owner: 'involvestecnologia',
+      repo: 'agilepromoterissues',
+      number: issue.number,
+      labels,
+    });
   }
-  return Promise.resolve();
 }
 
-async function addLabels(issues) {
+function addLabels(issues) {
   debug('updating issues labels');
-  const success = await addlabel(issue);
+  return new Promise((resolve, reject) => {
+    async.eachSeries(issues, addlabel, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
 }
 
 async function execute() {
