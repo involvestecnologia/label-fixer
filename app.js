@@ -9,30 +9,37 @@ const LABELS = [
   {
     NEW: 'prioridade:baixa',
     OLD: ['sup:frequencia:raramente', 'sup:gravidade:existem alternativas'],
+    PRIORITY: 3,
   },
   {
     NEW: 'prioridade:media',
     OLD: ['sup:frequencia:raramente', 'sup:gravidade:não consegue contornar'],
+    PRIORITY: 2,
   },
   {
     NEW: 'prioridade:media',
     OLD: ['sup:frequencia:ocasionalmente', 'sup:gravidade:existem alternativas'],
+    PRIORITY: 2,
   },
   {
     NEW: 'prioridade:bloqueante',
     OLD: ['sup:frequencia:sempre', 'sup:gravidade:não consegue contornar'],
+    PRIORITY: 1,
   },
   {
     NEW: 'prioridade:bloqueante',
     OLD: ['sup:acao imediata'],
+    PRIORITY: 1,
   },
   {
     NEW: 'prioridade:critico',
     OLD: ['sup:gravidade:não consegue contornar'],
+    PRIORITY: 0,
   },
   {
     NEW: 'prioridade:critico',
     OLD: ['sup:frequencia:ocasionalmente', 'sup:gravidade:não consegue contornar'],
+    PRIORITY: 0,
   },
 ];
 
@@ -65,6 +72,7 @@ async function getClosedIssues() {
     filtered.push(...next.data);
 
     if (github.hasNextPage(next)) {
+      // Recursive call
       await paginate(next);
     }
   };
@@ -104,9 +112,9 @@ function getIssuesTimeline(issues) {
   });
 }
 
-function persist(issues) {
+function persist(issues, file = 'issues.json') {
   return new Promise((resolve, reject) => {
-    fs.writeFile('issues.json', JSON.stringify(issues, null, 2), 'utf8', (err) => {
+    fs.writeFile(file, JSON.stringify(issues, null, 2), 'utf8', (err) => {
       if (err) return reject(err);
       resolve();
     });
@@ -143,16 +151,18 @@ async function buildIssuesList(issues) {
         .map('name')
         .value();
 
-      const toAddLabels = _.filter(LABELS, (lbl) => {
+      const labelsFound = _.filter(LABELS, (lbl) => {
         return _.every(lbl.OLD, (name) => {
           return _.includes(labelHistory, name);
         });
       });
 
-      if (!toAddLabels.length) return;
+      const label = _.minBy(labelsFound, 'PRIORITY');
+
+      if (!labelsFound.length) return;
       modifyable.push({
         number: issue.number,
-        labels: toAddLabels,
+        label,
       });
     }, (err) => {
       if (err) return reject(err);
@@ -163,23 +173,49 @@ async function buildIssuesList(issues) {
   return modifyable;
 }
 
-async function addlabel(issue) {
-  const labels = _.map(issue.labels, 'NEW');
-  debug('updating issue: ', issue.number, ' with labels: ', labels);
+async function addIssueLabels(issue) {
+  debug('updating issue: ', issue.number, ' with labels: ', issue.label.NEW);
   if (process.env.NODE_ENV === 'production') {
     return github.issues.addLabels({
       owner: 'involvestecnologia',
       repo: 'agilepromoterissues',
       number: issue.number,
-      labels,
+      labels: [issue.label.NEW],
     });
+  }
+}
+
+async function removeIssueLabels(issue) {
+  const labels = _.map(issue.labels, 'NEW');
+  debug('updating issue: ', issue.number, ' with labels: ', labels);
+  if (process.env.NODE_ENV === 'production') {
+    const promises = _.map(labels, label => new Promise((resolve) => {
+      github.issues.removeLabel({
+        owner: 'involvestecnologia',
+        repo: 'agilepromoterissues',
+        number: issue.number,
+        name: label,
+      }).finally(resolve);
+    }));
+
+    await Promise.all(promises);
   }
 }
 
 function addLabels(issues) {
   debug('updating issues labels');
   return new Promise((resolve, reject) => {
-    async.eachSeries(issues, addlabel, (err) => {
+    async.eachSeries(issues, addIssueLabels, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+}
+
+function removeLabels(issues) {
+  debug('updating issues labels');
+  return new Promise((resolve, reject) => {
+    async.eachSeries(issues, removeIssueLabels, (err) => {
       if (err) return reject(err);
       resolve();
     });
@@ -194,8 +230,8 @@ async function execute() {
   debug('loading from issues.json file');
 
   const issues = JSON.parse(fs.readFileSync('issues.json'));
-  const toAdd = await buildIssuesList(issues);
-  await addLabels(toAdd);
+  const results = await buildIssuesList(issues);
+  await addLabels(results);
 
   debug('labels updated');
 }
