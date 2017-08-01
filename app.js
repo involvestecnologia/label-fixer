@@ -78,8 +78,8 @@ async function getClosedIssues() {
   };
 
   const res = await github.issues.getForRepo({
-    owner: 'involvestecnologia',
-    repo: 'agilepromoterissues',
+    owner: process.env.owner,
+    repo: process.env.repo,
     state: 'closed',
   });
 
@@ -95,8 +95,8 @@ async function getClosedIssues() {
 async function getIssueTimeline(issue) {
   debug('Loading timeline for issue: ', issue.number);
   const { data } = await github.issues.getEventsTimeline({
-    owner: 'involvestecnologia',
-    repo: 'agilepromoterissues',
+    owner: process.env.owner,
+    repo: process.env.repo,
     issue_number: issue.number,
   });
 
@@ -177,8 +177,8 @@ async function addIssueLabels(issue) {
   debug('updating issue: ', issue.number, ' with labels: ', issue.label.NEW);
   if (process.env.NODE_ENV === 'production') {
     return github.issues.addLabels({
-      owner: 'involvestecnologia',
-      repo: 'agilepromoterissues',
+      owner: process.env.owner,
+      repo: process.env.repo,
       number: issue.number,
       labels: [issue.label.NEW],
     });
@@ -191,8 +191,8 @@ async function removeIssueLabels(issue) {
   if (process.env.NODE_ENV === 'production') {
     const promises = _.map(labels, label => new Promise((resolve) => {
       github.issues.removeLabel({
-        owner: 'involvestecnologia',
-        repo: 'agilepromoterissues',
+        owner: process.env.owner,
+        repo: process.env.repo,
         number: issue.number,
         name: label,
       }).finally(resolve);
